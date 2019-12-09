@@ -1,17 +1,21 @@
 package game_test
 
 import (
+	"flag"
 	"fmt"
 	"gophersices/quizgame/commons"
 	"gophersices/quizgame/game"
 	"io/ioutil"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
 
 func TestQuizzQuestions(t *testing.T) {
+	timeLimit := flag.Int("limit", 30, "The time limit for the quiz in seconds")
+	timer := time.NewTimer(time.Duration(*timeLimit) * time.Second)
 
 	tt := []struct {
 		Correct int          `json:"correct"`
@@ -46,8 +50,7 @@ func TestQuizzQuestions(t *testing.T) {
 		defer func() { os.Stdin = oldStdin }()
 
 		os.Stdin = answerFile
-
-		if err := game.QuizzQuestions(tc.P, &correct, i); err == nil {
+		if err := game.QuizzQuestions(tc.P, &correct, i, len(tt), *timer); err == nil {
 			assert.Equal(t, tc.Correct, correct)
 		}
 

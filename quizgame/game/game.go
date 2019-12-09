@@ -3,11 +3,16 @@ package game
 import (
 	"bufio"
 	"encoding/csv"
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"strings"
+	"sync"
+	"time"
 )
+
+var mux sync.Mutex
 
 // Problem based on the csv has a question and answer fields/
 // to be compared with the user input
@@ -31,16 +36,30 @@ func ParseLines(lines [][]string) []Problem {
 
 //QuizzQuestions implement a check wether the answer
 // provided from the user is the answer for the defined problem.
-func QuizzQuestions(p Problem, correct *int, i int) error {
+func QuizzQuestions(p Problem, correct *int, i, totalProblems int, timer time.Timer) error {
 	//uses a scanner to get information from the user
 	// will be replaced by an __io.Reader__
-	fmt.Printf("Problem #%d: %s = \n", i, p.Question)
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Scan()
-	answer := scanner.Text()
 
-	if answer == p.Answer {
-		*correct++
+	fmt.Printf("Problem #%d: %s = \n", i+1, p.Question)
+	var answer string
+	answerCh := make(chan string)
+
+	go func() {
+		scanner := bufio.NewScanner(os.Stdin)
+		scanner.Scan()
+		answer = scanner.Text()
+		answerCh <- answer
+	}()
+
+	select {
+	case <-timer.C:
+		fmt.Printf("You scored %d out of %d \n", *correct, totalProblems)
+		err := errors.New("tempo esgotado")
+		return err
+	case answer := <-answerCh:
+		if answer == p.Answer {
+			*correct++
+		}
 	}
 	return nil
 }
@@ -62,6 +81,8 @@ func GetCsv(fileType, fileName string) *os.File {
 // answer correctly all on the terminal.
 func QuizzGame() {
 
+	timeLimit := flag.Int("limit", 30, "The time limit for the quiz in seconds")
+
 	file := GetCsv("csv", "problems.csv")
 	r := csv.NewReader(file)
 	lines, err := r.ReadAll()
@@ -71,12 +92,17 @@ func QuizzGame() {
 	}
 
 	problems := ParseLines(lines)
-	correct := 0
-	for i, p := range problems {
-		QuizzQuestions(p, &correct, i)
-	}
 
-	fmt.Printf("You scored %d out of %d \n", correct, len(problems))
+	timer := time.NewTimer(time.Duration(*timeLimit) * time.Second)
+
+	var correct int
+	for i, p := range problems {
+		err := QuizzQuestions(p, &correct, i, len(problems), *timer)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
+	}
 }
 
 func exit(msg string) {
