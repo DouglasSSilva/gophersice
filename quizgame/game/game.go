@@ -53,7 +53,7 @@ func QuizzQuestions(p Problem, correct *int, i, totalProblems int, timer time.Ti
 
 	select {
 	case <-timer.C:
-		fmt.Printf("You scored %d out of %d \n", *correct, totalProblems)
+		fmt.Printf("\nYou scored %d out of %d \n", *correct, totalProblems)
 		err := errors.New("tempo esgotado")
 		return err
 	case answer := <-answerCh:
